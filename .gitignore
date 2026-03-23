@@ -1,20 +1,9 @@
-# Node modules
-/node_modules
+node_modules
+.env
+coverage
+coverage.json
+typechain-types
 
-# Compilation output
-/dist
-
-# pnpm deploy output
-/bundle
-
-# Hardhat Build Artifacts
-/artifacts
-
-# Hardhat compilation (v2) support directory
-/cache
-
-# Typechain output
-/types
-
-# Hardhat coverage reports
-/coverage
+# Hardhat files
+cache
+artifacts
