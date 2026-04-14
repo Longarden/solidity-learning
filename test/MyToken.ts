@@ -87,5 +87,26 @@ describe("My Token", () => {
           )
       ).to.be.revertedWith("insufficient allowance");
     });
+
+    it("should transfer signer0's token to signer1 via approve & transferFrom", async () => {
+      const signer0 = signers[0];
+      const signer1 = signers[1];
+      const amount = hre.ethers.parseUnits("10", decimals);
+
+      // 1. approve: signer0 -> signer1에게 권한 부여
+      await myTokenC.approve(signer1.address, amount);
+      expect(await myTokenC.allowance(signer0.address, signer1.address)).to.equal(amount);
+
+      // 2. transferFrom: signer1이 signer0의 MT토큰을 signer1로 전송
+      const signer0BalanceBefore = await myTokenC.balanceOf(signer0.address);
+      await myTokenC
+        .connect(signer1)
+        .transferFrom(signer0.address, signer1.address, amount);
+
+      // 3. balance 확인
+      expect(await myTokenC.balanceOf(signer0.address)).to.equal(signer0BalanceBefore - amount);
+      expect(await myTokenC.balanceOf(signer1.address)).to.equal(amount);
+      expect(await myTokenC.allowance(signer0.address, signer1.address)).to.equal(0);
+    });
   });
 });
