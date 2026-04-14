@@ -1,31 +1,91 @@
-import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
+import { MyToken } from "../typechain-types";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import hre from "hardhat";
 
-describe("MyToken - approve & transferFrom", function () {
-  async function deployFixture() {
-    const [signer0, signer1] = await hre.ethers.getSigners();
-    const MyToken = await hre.ethers.getContractFactory("MyToken");
-    const token = await MyToken.deploy("MyToken", "MT", 18, 1);
-    return { token, signer0, signer1 };
-  }
+const mintingAmount = 100n;
+const decimals = 18n;
 
-  it("signer1에 의한 signer0 자산 이동 (approve & transferFrom)", async function () {
-    const { token, signer0, signer1 } = await loadFixture(deployFixture);
+describe("My Token", () => {
+  let myTokenC: MyToken;
+  let signers: HardhatEthersSigner[];
 
-    const amount = hre.ethers.parseUnits("1", 18);
-    const initialBalance = await token.balanceOf(signer0.address);
+  beforeEach("should deploy", async () => {
+    signers = await hre.ethers.getSigners();
+    myTokenC = await hre.ethers.deployContract("MyToken", [
+      "MyToken",
+      "MT",
+      decimals,
+      mintingAmount,
+    ]);
+  });
 
-    // 1. approve: signer0 -> signer1에게 권한 부여
-    await token.connect(signer0).approve(signer1.address, amount);
-    expect(await token.allowance(signer0.address, signer1.address)).to.equal(amount);
+  describe("Basic state value check", () => {
+    it("should return name", async () => {
+      expect(await myTokenC.name()).equal("MyToken");
+    });
+    it("should return symbol", async () => {
+      expect(await myTokenC.symbol()).equal("MT");
+    });
+    it("should return decimals", async () => {
+      expect(await myTokenC.decimals()).equal(decimals);
+    });
+    it("should return 100 totalSupply", async () => {
+      expect(await myTokenC.totalSupply()).equal(
+        mintingAmount * 10n ** decimals
+      );
+    });
+  });
 
-    // 2. transferFrom: signer1이 signer0의 토큰을 signer1에게 이동
-    await token.connect(signer1).transferFrom(signer0.address, signer1.address, amount);
+  describe("Mint", () => {
+    it("should return 1MT balance for signer 0", async () => {
+      expect(await myTokenC.balanceOf(signers[0].address)).to.equal(
+        mintingAmount * 10n ** decimals
+      );
+    });
+  });
 
-    // 3. balance 확인
-    expect(await token.balanceOf(signer0.address)).to.equal(initialBalance - amount);
-    expect(await token.balanceOf(signer1.address)).to.equal(amount);
-    expect(await token.allowance(signer0.address, signer1.address)).to.equal(0);
+  describe("Transfer", () => {
+    it("shoud have 0.5MT", async () => {
+      const sendAmount = hre.ethers.parseUnits("0.5", decimals);
+      await myTokenC.transfer(sendAmount, signers[1].address);
+      expect(await myTokenC.balanceOf(signers[1].address)).to.equal(sendAmount);
+    });
+
+    it("shoud be reverted with insufficient balance error", async () => {
+      const overAmount = (mintingAmount + 1n) * 10n ** decimals; // 101 MT
+      await expect(
+        myTokenC.transfer(overAmount, signers[1].address)
+      ).to.be.revertedWith("insufficient balance");
+    });
+  });
+
+  describe("TransferFrom", () => {
+    it("should emit Approval event", async () => {
+      const signer1 = signers[1];
+      await expect(
+        myTokenC.approve(signer1.address, hre.ethers.parseUnits("10", decimals))
+      )
+        .to.emit(myTokenC, "Approval")
+        .withArgs(
+          signers[0].address,
+          signer1.address,
+          hre.ethers.parseUnits("10", decimals)
+        );
+    });
+
+    it("should be reverted with insufficient allowance error", async () => {
+      const signer0 = signers[0];
+      const signer1 = signers[1];
+      await expect(
+        myTokenC
+          .connect(signer1)
+          .transferFrom(
+            signer0.address,
+            signer1.address,
+            hre.ethers.parseUnits("1", decimals)
+          )
+      ).to.be.revertedWith("insufficient allowance");
+    });
   });
 });
