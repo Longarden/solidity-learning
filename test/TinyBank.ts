@@ -83,5 +83,23 @@ describe("TinyBank", () => {
                 tinyBankC.connect(hacker).setRewardPerBlock(rewardToChange)
             ).to.be.revertedWith("You are not a manager");
         });
+
+        it("Should revert when not all managers confirmed", async () => {
+            const newReward = hre.ethers.parseUnits("10", DECIMALS);
+            await tinyBankC.connect(signers[0]).confirm();
+            await tinyBankC.connect(signers[1]).confirm();
+            await expect(
+                tinyBankC.connect(signers[0]).setRewardPerBlock(newReward)
+            ).to.be.revertedWith("Not all confirmed yet");
+        });
+
+        it("Should change rewardPerBlock when all managers confirmed", async () => {
+            const newReward = hre.ethers.parseUnits("10", DECIMALS);
+            await tinyBankC.connect(signers[0]).confirm();
+            await tinyBankC.connect(signers[1]).confirm();
+            await tinyBankC.connect(signers[2]).confirm();
+            await tinyBankC.connect(signers[0]).setRewardPerBlock(newReward);
+            expect(await tinyBankC.rewardPerBlock()).equal(newReward);
+        });
     });
 });
